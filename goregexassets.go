@@ -15,7 +15,7 @@ import (
 )
 
 // AllowedAssetTypes - List of asset types that this script can search for
-var AllowedAssetTypes []string = []string{"email", "ip", "domain"}
+var AllowedAssetTypes []string = []string{"email", "ip", "domain", "urlpath"}
 
 // Find takes a slice and looks for an element in it. If found it will
 // return it's key, otherwise it will return -1 and a bool of false.
@@ -32,16 +32,29 @@ func Find(slice []string, val string) (int, bool) {
 const RegexIP = "[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}"
 const RegexDomain = "([a-zA-Z0-9_-]+\\.)+[a-zA-Z0-9_-]{1,6}"
 const RegexEmail = "[a-zA-Z0-9_-]+@([a-zA-Z0-9_-]+\\.)+[a-zA-Z0-9]{1,6}"
+const RegexURLPath = "/[0-9a-zA-Z/.#=?&-]+"
 
 func main() {
 	pathsToParse := flag.String("paths", "",
 		"files/folder paths from which to extract assets")
 	assetType := flag.String("assetType", "",
 		"AssetType to extract. Can be one of: "+strings.Join(AllowedAssetTypes, ","))
+	threadsPtr := flag.Int("t", 20, "Number of threads to use to process files")
+	verbosePtr := flag.Bool("v", false, "Print Verbose messages")
 	flag.Parse()
 
+	threads := *threadsPtr
+	verbose := *verbosePtr
+
+	// Disable verbose logging to stdout if verbose flag not set
+	if !verbose {
+		log.SetFlags(0)
+		log.SetOutput(ioutil.Discard)
+	}
+
 	if *pathsToParse == "" {
-		log.Fatalln("[-] Files for assets to parse must be provided.")
+		fmt.Println("[-] Files for assets to parse must be provided.\n")
+		log.Fatalln("[-] Files for assets to parse must be provided.\n")
 	}
 
 	// Check if valid asset type provided
@@ -53,7 +66,9 @@ func main() {
 		}
 	}
 	if !isValidAssetType {
-		log.Fatalf("[-] Invalid asset type: %s provided. Can be one of: %s",
+		fmt.Printf("[-] Invalid asset type: %s provided. Can be one of: %s\n",
+			*assetType, strings.Join(AllowedAssetTypes, ","))
+		log.Fatalf("[-] Invalid asset type: %s provided. Can be one of: %s\n",
 			*assetType, strings.Join(AllowedAssetTypes, ","))
 	}
 
@@ -112,26 +127,33 @@ func main() {
 	var emails []string
 	var domains []string
 	var ips []string
+	var urlPaths []string
 
 	// Define locks for each slice to ensure that goroutines don't run over each
 	// other and not give unique output
 	var emailsMutex sync.Mutex
 	var domainsMutex sync.Mutex
 	var ipsMutex sync.Mutex
+	var urlPathsMutex sync.Mutex
 
 	var wg sync.WaitGroup
 
+	// Filepaths to process on light-threads/goroutines
+	filepaths := make(chan string)
+
 	// Start look through each file path now, and add assets if not found
-	for _, filepath := range filesToParse {
+	for i := 0; i < threads; i++ {
+		wg.Add(1)
 
-		if filepath != "" {
-			wg.Add(1)
-			go func(filepath string) {
-				defer wg.Done()
+		go func(wg *sync.WaitGroup) {
+			defer wg.Done()
 
+			for filepath := range filepaths {
 				// Read the file contents
 				bincontent, err := ioutil.ReadFile(filepath)
 				if err != nil {
+					fmt.Printf("[-] Cannot read file: %s. Error: %s\n", filepath,
+						err.Error())
 					log.Fatalf("[-] Cannot read file: %s. Error: %s\n", filepath,
 						err.Error())
 				}
@@ -139,7 +161,31 @@ func main() {
 
 				// Cannot read a file: stop script since something is wrong...
 				if err != nil {
+					fmt.Printf("[-] Can't read file: %s\n", filepath)
 					log.Fatalf("[-] Can't read file: %s\n", filepath)
+				}
+
+				// Get all paths from a file
+				if *assetType == "all" || *assetType == "urlpath" {
+					regexEmail, _ := regexp.Compile(RegexURLPath)
+					urlPathsInFile := regexEmail.FindAllString(fileContent, -1)
+					for _, urlPath := range urlPathsInFile {
+
+						// Only build a list of unique emails
+						prevFound := false
+						urlPathsMutex.Lock()
+						for _, iURLPath := range urlPaths {
+							if urlPath == iURLPath {
+								prevFound = true
+								break
+							}
+						}
+						if !prevFound {
+							emails = append(urlPaths, urlPath)
+							fmt.Println(urlPath)
+						}
+						urlPathsMutex.Unlock()
+					}
 				}
 
 				// Get all emails from a file
@@ -225,10 +271,16 @@ func main() {
 						}
 					}
 				}
+			}
+		}(&wg)
+	}
 
-			}(filepath)
+	for _, filepath := range filesToParse {
+		if filepath != "" {
+			filepaths <- filepath
 		}
 	}
+	close(filepaths)
 
 	wg.Wait()
 

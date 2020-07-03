@@ -28,3 +28,11 @@ To extract ALL IPs from a folder `/tmp/`, run the following cmd.
 ```
 go run goregexassets/goregexassets.go -paths /tmp/ -assetType email
 ```
+
+### Extract all URL paths from a file/folder
+To extract ALL IPs from a folder `/tmp/`, run the following cmd.
+
+```
+go run goregexassets/goregexassets.go -paths /tmp/ -assetType urlpath
+```
+
