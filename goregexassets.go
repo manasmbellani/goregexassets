@@ -15,7 +15,8 @@ import (
 )
 
 // AllowedAssetTypes - List of asset types that this script can search for
-var AllowedAssetTypes []string = []string{"email", "ip", "domain", "urlpath"}
+var AllowedAssetTypes []string = []string{"email", "ip", "domain", "urlpath",
+	"companydomain"}
 
 // Find takes a slice and looks for an element in it. If found it will
 // return it's key, otherwise it will return -1 and a bool of false.
@@ -41,10 +42,19 @@ func main() {
 		"AssetType to extract. Can be one of: "+strings.Join(AllowedAssetTypes, ","))
 	threadsPtr := flag.Int("t", 20, "Number of threads to use to process files")
 	verbosePtr := flag.Bool("v", false, "Print Verbose messages")
+	companyDomain := flag.String("cd", "",
+		"Determine the company domain to get ALL company subdomains from")
 	flag.Parse()
 
 	threads := *threadsPtr
 	verbose := *verbosePtr
+
+	// company domain must be specified if we are interested in company's
+	// subdomains
+	if *assetType == "companydomain" && *companyDomain == "" {
+		fmt.Println("[-] Company domain must be specified to get subdomains")
+		log.Fatalln("[-] Company domain must be specified to get subdomains")
+	}
 
 	// Disable verbose logging to stdout if verbose flag not set
 	if !verbose {
@@ -52,9 +62,10 @@ func main() {
 		log.SetOutput(ioutil.Discard)
 	}
 
+	// No paths specified - what do we parse?
 	if *pathsToParse == "" {
-		fmt.Println("[-] Files for assets to parse must be provided.\n")
-		log.Fatalln("[-] Files for assets to parse must be provided.\n")
+		fmt.Println("[-] Files for assets to parse must be provided")
+		log.Fatalln("[-] Files for assets to parse must be provided")
 	}
 
 	// Check if valid asset type provided
@@ -236,7 +247,9 @@ func main() {
 				}
 
 				// Read all domains from file
-				if *assetType == "all" || *assetType == "domain" {
+				if *assetType == "all" || *assetType == "domain" ||
+					*assetType == "companydomain" {
+
 					regexDomain, _ := regexp.Compile(RegexDomain)
 					domainsInFile := regexDomain.FindAllString(fileContent, -1)
 
@@ -265,7 +278,22 @@ func main() {
 							}
 							if !prevFound {
 								domains = append(domains, domain)
-								fmt.Println(domain)
+
+								// We are only interested in subdomains which are
+								// subdomains of the company
+								if *assetType == "companydomain" {
+									if strings.HasSuffix(strings.ToLower(domain),
+										*companyDomain) {
+
+										fmt.Println(domain)
+									}
+
+								} else {
+									// Print the domain as-is, as we are
+									// interested in all subdomains of a company's
+									// domain
+									fmt.Println(domain)
+								}
 							}
 							domainsMutex.Unlock()
 						}
