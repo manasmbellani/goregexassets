@@ -104,6 +104,13 @@ func main() {
 			// Get all files from the folder recursively - harder case
 			case mode.IsDir():
 
+				// add a trailing '/' - otherwise file.path.Walk doesn't appear
+				// to work on Macs atleast (possible bug?)
+				if !strings.HasSuffix(pathToCheck, "/") {
+					pathToCheck = pathToCheck + "/"
+				}
+
+				// Walk through the provided directory and get files to parse
 				filepath.Walk(pathToCheck,
 					func(path string, f os.FileInfo, err error) error {
 
