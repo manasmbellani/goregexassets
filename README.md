@@ -36,7 +36,7 @@ To extract ALL IPs from a folder `/tmp/`, run the following cmd.
 go run goregexassets.go -paths /tmp/ -assetType email
 ```
 
-### Eextract all the subdomains for a given company domain
+### Extract all the subdomains for a given company domain
 To extract ALL the subdomains for a company domain `google.com`, run the command:
 ```
 go run goregexassets.go -paths /tmp -assetType companydomain -cd google.com
