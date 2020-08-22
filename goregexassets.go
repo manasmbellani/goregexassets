@@ -290,7 +290,7 @@ func main() {
 								// subdomains of the company
 								if *assetType == "companydomain" {
 									if strings.HasSuffix(strings.ToLower(domain),
-										*companyDomain) {
+										"."+*companyDomain) {
 
 										fmt.Println(domain)
 									}
