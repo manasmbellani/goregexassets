@@ -33,7 +33,7 @@ func Find(slice []string, val string) (int, bool) {
 const RegexIP = "[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}"
 const RegexDomain = "([a-zA-Z0-9_-]+\\.)+[a-zA-Z0-9_-]{1,6}"
 const RegexEmail = "[a-zA-Z0-9_-]+@([a-zA-Z0-9_-]+\\.)+[a-zA-Z0-9]{1,6}"
-const RegexURLPath = "/[0-9a-zA-Z/.#=?&-]+"
+const RegexURLPath = "(?:[a-z0-9A-Z=&?-]+://)[0-9a-zA-Z/.#=?&-]+"
 
 func main() {
 	pathsToParse := flag.String("paths", "",
